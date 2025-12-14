@@ -9,6 +9,7 @@ export const useParkingStore = defineStore('parking', {
         // Stav užívateľa
         userPoints: 0,
         userRequests: [], // Zoznam žiadostí, vrátane alokácií (JOIN)
+        adminUsers: [], // Zoznam všetkých používateľov pre admina
         
         // Stav aplikácie
         isLoading: false,
@@ -88,6 +89,32 @@ export const useParkingStore = defineStore('parking', {
                             this.isLoading = false;
                         }
                     },
+
+        /**
+         * Načíta zoznam všetkých používateľov s ich prioritnými bodmi (Pre Admina) cez RPC.
+         */
+        async fetchAdminUsers() {
+            this.isLoading = true;
+            this.error = null;
+
+            try {
+                // Používame RPC funkciu get_admin_user_list
+                const { data: users, error: rpcError } = await supabase
+                    .rpc('get_admin_user_list');
+
+                if (rpcError) throw rpcError;
+                
+                // Dáta sú už správne naformátované, stačí ich uložiť
+                this.adminUsers = users;
+
+            } catch (err) {
+                console.error('Chyba pri načítaní admin používateľov:', err);
+                // Kontrola pre prípad, že užívateľ nie je prihlásený, ale snaží sa načítať
+                this.error = `Nepodarilo sa načítať používateľov: ${err.message || 'Neznáma chyba.'}`;
+            } finally {
+                this.isLoading = false;
+            }
+        },
 
         /**
          * Podá novú žiadosť o parkovacie miesto.

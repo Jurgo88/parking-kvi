@@ -16,12 +16,12 @@ body {
 
 header {
     width: 100%;
-    background-color: #007bff; /* Modrý tón pre hlavičku */
+    background-color: #0e7f80; 
     color: white;
-    padding: 15px 30px;
+    padding: 15px 0;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     display: flex;
-    justify-content: space-between;
+    justify-content: space-around;
     align-items: center;
 }
 

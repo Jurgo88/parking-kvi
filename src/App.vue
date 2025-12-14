@@ -1,6 +1,13 @@
 <template>
   <header>
+    <nav class="main-nav">
+        <router-link to="/" class="nav-link">Domov</router-link>
+        <span v-if="authStore.isAuthenticated"> | </span>
+        <router-link v-if="authStore.isAdmin" to="/admin" class="nav-link">Admin Dashboard</router-link>
+    </nav>
+    
     <h1>Parkovací Systém KVI</h1>
+    
     <p v-if="authStore.isAuthenticated">
       Prihlásený: {{ authStore.user.email }} | 
       PB: {{ parkingStore.getUserPoints }}
@@ -9,37 +16,20 @@
   </header>
 
   <main>
-    <div v-if="authStore.loadingSession">
-      Preverujem stav prihlásenia...
-    </div>
-    
-    <div v-else-if="!authStore.isAuthenticated">
-      <AuthForm />
-    </div>
-
-    <div v-else>
-      <ParkingRequestForm />
-
-      <hr> 
-      
-      <UserAllocations /> 
-    </div>
+    <router-view /> 
   </main>
 </template>
 
 <script setup>
-import { onMounted, watch } from 'vue';
+import { watch } from 'vue';
 import { useParkingStore } from '@/stores/ParkingStore';
 import { useAuthStore } from '@/stores/AuthStore';
-import ParkingRequestForm from '@/components/ParkingRequestForm.vue';
-import AuthForm from '@/components/AuthForm.vue';
-// *** NOVÝ IMPORT ***
-import UserAllocations from '@/components/UserAllocations.vue'; 
+// DÔLEŽITÉ: Odstránili sme importy: ParkingRequestForm, AuthForm, UserAllocations
 
 const parkingStore = useParkingStore();
 const authStore = useAuthStore();
 
-// Watcher bezo zmeny
+// Watcher zostáva
 watch(() => authStore.userId, (newUserId) => {
   if (newUserId) {
     parkingStore.fetchUserStatus();
@@ -48,3 +38,7 @@ watch(() => authStore.userId, (newUserId) => {
   }
 }, { immediate: true });
 </script>
+
+<style scoped>
+/* Vaše štýly */
+</style>
