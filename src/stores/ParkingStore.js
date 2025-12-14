@@ -31,67 +31,63 @@ export const useParkingStore = defineStore('parking', {
          * Načíta prioritné body a všetky žiadosti/alokácie používateľa.
          */
         async fetchUserStatus() {
-            this.isLoading = true;
-            this.error = null;
+                        this.isLoading = true;
+                        this.error = null;
+                        
+                        const authStore = useAuthStore();
+                        const userId = authStore.userId; 
+                        
+                        if (!userId) {
+                            this.isLoading = false;
+                            this.userPoints = 0;
+                            this.userRequests = [];
+                            return; 
+                        }
+                        
+                        try {
+                            // 1. Získanie Prioritných Bodov (Bezo zmeny)
+                            const { data: user, error: userError } = await supabase
+                                .from('users')
+                                .select('priority_points')
+                                .eq('user_id', userId)
+                                .single(); 
+                            
+                            if (userError && userError.code !== 'PGRST116') {
+                                throw userError;
+                            }
+                            this.userPoints = user ? user.priority_points : 0;
             
-            const authStore = useAuthStore();
-            const userId = authStore.userId; 
+                            // 2. Získanie všetkých žiadostí s ich alokáciami - VOLÁME POHĽAD!
+                            const { data: requests, error: reqError } = await supabase
+                                                 .from('user_request_summary') // <-- KĽÚČOVÁ ZMENA: VOLÁME VIEW
+                                                 .select('*')
+                                                 .eq('user_id', userId)
+                                                 .order('parking_date', { ascending: true });
+                            
+                                 if (reqError) throw reqError;
+                            
+                            // Formátovanie dát: Vytvárame objekt 'allocation' pre komponentu
+                            this.userRequests = requests.map(req => ({
+                                ...req,
+                                // Ak existuje allocation_id (z VIEW), vytvoríme objekt 'allocation'
+                                allocation: req.allocation_id != null ?{
+                                    allocation_id: req.allocation_id,
+                                    spot_number: req.spot_number,
+                                    is_cancelled: req.is_cancelled,
+                                    points_change: req.points_change,
+                                    // Pridávame aj dátum a sekciu priamo do allocation, ak to potrebujete
+                                    parking_date: req.parking_date, 
+                                    preferred_section: req.preferred_section
+                                } : null
+                            }));
             
-            if (!userId) {
-                this.isLoading = false;
-                // Ak nie je prihlásený, nastavíme default stav
-                this.userPoints = 0;
-                this.userRequests = [];
-                return; 
-            }
-            
-            try {
-                // 1. Získanie Prioritných Bodov
-                const { data: user, error: userError } = await supabase
-                    .from('users')
-                    .select('priority_points')
-                    .eq('user_id', userId)
-                    .single(); 
-                
-                if (userError && userError.code !== 'PGRST116') { // PGRST116 = Neprázdny výsledok (OK)
-                    throw userError;
-                }
-                this.userPoints = user ? user.priority_points : 0;
-
-                // 2. Získanie všetkých žiadostí s ich alokáciami (KROK 11.C: JOIN)
-                const { data: requests, error: reqError } = await supabase
-                    .from('requests')
-                    .select(`
-                        request_id,
-                        parking_date,
-                        preferred_section,
-                        is_successful,
-                        allocations (
-                            allocation_id, 
-                            section_allocated, 
-                            is_cancelled, 
-                            points_change
-                        )
-                    `)
-                    .eq('user_id', userId)
-                    .order('parking_date', { ascending: true });
-
-                if (reqError) throw reqError;
-                
-                // Formátovanie dát: Zjednodušíme štruktúru alokácií na jeden objekt
-                this.userRequests = requests.map(req => ({
-                    ...req,
-                    // Ak existuje alokácia, pripojíme ju priamo k objektu žiadosti
-                    allocation: req.allocations.length > 0 ? req.allocations[0] : null
-                }));
-
-            } catch (err) {
-                console.error('Chyba pri načítaní stavu používateľa:', err);
-                this.error = `Nepodarilo sa načítať dáta: ${err.message}`;
-            } finally {
-                this.isLoading = false;
-            }
-        },
+                        } catch (err) {
+                            console.error('Chyba pri načítaní stavu používateľa:', err);
+                            this.error = `Nepodarilo sa načítať dáta: ${err.message}`;
+                        } finally {
+                            this.isLoading = false;
+                        }
+                    },
 
         /**
          * Podá novú žiadosť o parkovacie miesto.
@@ -101,6 +97,17 @@ export const useParkingStore = defineStore('parking', {
             this.error = null;
             const authStore = useAuthStore();
             const userId = authStore.userId; 
+            const existingActiveRequest = this.userRequests.find(
+                                // Správne používa vstupný parameter 'parkingDate'
+                                (req) => req.parking_date === parkingDate && !req.is_cancelled
+                            );
+                        
+                            if (existingActiveRequest) {
+                                // Používame správnu premennú 'parkingDate' v chybovej správe
+                                this.error = `Na dátum ${parkingDate} už existuje aktívna žiadosť.`;
+                                this.isLoading = false;
+                                return;
+                            }
 
             if (!userId) {
                 this.error = "Pre podanie žiadosti sa musíte prihlásiť.";
@@ -122,7 +129,7 @@ export const useParkingStore = defineStore('parking', {
                         { 
                             user_id: userId, 
                             parking_date: parkingDate, 
-                            preferred_section: preferredSection 
+                            preferred_section: preferredSection,
                         }
                     ]);
 
@@ -154,6 +161,7 @@ export const useParkingStore = defineStore('parking', {
             
             const authStore = useAuthStore();
             const userId = authStore.userId;
+            const numericAllocationId = parseInt(allocationId);
 
             if (!userId) {
                 this.error = "Nie ste prihlásený.";
@@ -164,7 +172,7 @@ export const useParkingStore = defineStore('parking', {
             try {
                 // Volanie Supabase RPC (SQL funkcie)
                 const { error } = await supabase.rpc('cancel_allocation', {
-                    p_allocation_id: allocationId, 
+                    p_allocation_id: numericAllocationId, 
                     p_user_id: userId              
                 });
 

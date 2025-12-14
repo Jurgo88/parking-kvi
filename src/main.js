@@ -1,6 +1,7 @@
 // src/main.js
 
 // import './assets/main.css'
+import './style.css' // <--- AKTUALIZOVANÝ ŠTÝL SÚBOR
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

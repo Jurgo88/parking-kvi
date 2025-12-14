@@ -1,51 +1,111 @@
 <template>
-    <div v-if="allocation">
-        <p>Miesto: <strong>{{ allocation.section_allocated }}</strong></p>
-        <p v-if="allocation.is_cancelled" style="color: red;">ZRUŠENÉ: Body {{ allocation.points_change > 0 ? 'vrátené' : 'stratené' }}</p>
-
+    <div class="allocation-info">
+        <p v-if="allocation.spot_number" class="spot-details"> 
+            <strong>Miesto:</strong> {{ allocation.spot_number }}
+            <span v-if="allocation.preferred_section"> ({{ allocation.preferred_section }})</span>
+            
+            <span v-if="allocation.points_change" class="points-change">
+                [PB: {{ allocation.points_change }}]
+            </span>
+        </p>
+        <p v-else class="spot-details">
+            <strong>Miesto:</strong> Získané, ale chyba v detaile miesta
+        </p>
+        
         <button 
-            v-else 
-            @click="handleCancellation(allocation.allocation_id)"
-            :disabled="parkingStore.isLoading"
+            v-if="!isPastDate && !allocation.is_cancelled" 
+            @click="handleCancel" 
+            :disabled="isCancelling"
             class="cancel-btn"
         >
-            Zrušiť rezerváciu
+            {{ isCancelling ? 'Zrušenie...' : 'Zrušiť alokáciu' }}
         </button>
-    </div>
-    <div v-else>
-        <p>Alokácia čaká na potvrdenie.</p>
+
+        <p v-else-if="allocation.is_cancelled" class="note cancelled">
+            ❌ Táto alokácia bola zrušená.
+        </p>
+        <p v-else class="note">
+            ⚠️ Alokáciu už nie je možné zrušiť (dátum prešiel).
+        </p>
     </div>
 </template>
 
+
+
 <script setup>
-import { computed } from 'vue';
+import { defineProps, ref, computed } from 'vue';
 import { useParkingStore } from '@/stores/ParkingStore';
 
 const props = defineProps({
-    requestId: Number
+    // Celý objekt alokácie, ktorý posielame z UserAllocations.vue
+    allocation: {
+        type: Object,
+        required: true
+    },
+    // Dátum parkovania, ktorý posielame z UserAllocations.vue
+    parkingDate: {
+        type: String, // Očakávame formát YYYY-MM-DD
+        required: true
+    }
 });
 
 const parkingStore = useParkingStore();
+const isCancelling = ref(false);
 
-// Filrujeme alokácie priamo zo Store (ideálne by sme to robili v Getters)
-const allocation = computed(() => 
-    parkingStore.userRequests.find(r => r.request_id === props.requestId)
-);
+// Vypočítaná vlastnosť: Skontroluje, či je dátum parkovania už v minulosti
+const isPastDate = computed(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); 
+    const allocationDate = new Date(props.parkingDate);
+    allocationDate.setHours(0, 0, 0, 0);
 
-const handleCancellation = async (allocationId) => {
-    if (confirm("Naozaj chcete zrušiť rezerváciu? V závislosti od času Vám nemusia byť vrátené Prioritné Body.")) {
-        await parkingStore.cancelAllocation(allocationId);
+    return allocationDate < today;
+});
+
+const handleCancel = async () => {
+    if (confirm('Naozaj chcete zrušiť túto alokáciu? Získate prioritné body. Pokračovať?')) {
+        isCancelling.value = true;
+        try {
+            // Volanie akcie v Store, ktorá volá SQL funkciu 'cancel_allocation'
+            await parkingStore.cancelAllocation(props.allocation.allocation_id);
+            
+            alert('Alokácia bola úspešne zrušená a body pripísané!');
+            // Store po úspechu automaticky obnoví stav cez fetchUserStatus()
+            
+        } catch (e) {
+            alert('Chyba pri zrušení alokácie: ' + e.message);
+        } finally {
+            isCancelling.value = false;
+        }
     }
 };
 </script>
 
 <style scoped>
+.allocation-info { 
+    margin-top: 5px; 
+    padding: 5px; 
+    /* ... zachovanie vašich štýlov ... */
+    border-top: 1px dashed #eee; 
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
 .cancel-btn {
     background-color: #dc3545;
     color: white;
     border: none;
     padding: 5px 10px;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
+    font-size: 0.9em;
+}
+.cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.note {
+    color: #6c757d;
+    font-size: 0.85em;
 }
 </style>

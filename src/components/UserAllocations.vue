@@ -7,21 +7,30 @@
     <div v-else>
       <ul class="request-items">
         <li v-for="req in parkingStore.userRequests" :key="req.request_id">
-          <strong>Dátum: {{ req.parking_date }}</strong> | 
-          Preferovaná sekcia: {{ req.preferred_section }}
+          
+          <div class="request-header">
+            {{ req.parking_date }} - {{ req.preferred_section }} -
 
-          <span v-if="req.is_successful" class="status success">
-            ✅ PRIDELENÉ
-          </span>
-          <span v-else class="status pending">
-            ⏳ ČAKÁ NA ŽREBOVANIE
-          </span>
+            <span v-if="req.is_cancelled" class="status cancelled">
+              ❌ ZRUŠENÁ
+            </span>
+            <span v-else-if="req.final_status === 'PRIDELENÉ'" class="status success">
+              ✅ PRIDELENÉ
+            </span>
+            <span v-else class="status pending">
+              ⏳ {{ req.final_status }}
+            </span>
+          </div>
 
-          <template v-if="req.is_successful">
+          <template v-if="req.final_status === 'PRIDELENÉ' && !req.is_cancelled">
             <div class="allocation-details">
-                <AllocationStatus :requestId="req.request_id" />
+              <AllocationStatus 
+                   :allocation="req.allocation" 
+                   :parkingDate="req.parking_date" 
+              />
             </div>
           </template>
+
         </li>
       </ul>
     </div>
@@ -36,15 +45,69 @@ const parkingStore = useParkingStore();
 </script>
 
 <style scoped>
-.request-items { list-style: none; padding: 0; }
+.allocation-list {
+    background-color: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.allocation-list h2 {
+    margin-top: 0;
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.request-items { 
+    list-style: none; 
+    padding: 0; 
+}
+
 .request-items li { 
-    border: 1px solid #ccc; 
-    padding: 10px; 
+    border: 1px solid #dee2e6; /* Svetlo sivý okraj */
+    padding: 15px; 
     margin-bottom: 10px;
     background: #fff;
+    border-radius: 4px;
+    transition: box-shadow 0.2s;
 }
-.status { padding: 2px 5px; border-radius: 3px; font-weight: bold; margin-left: 10px; }
-.success { background-color: #d4edda; color: #155724; }
-.pending { background-color: #fff3cd; color: #856404; }
-.allocation-details { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #eee; }
+
+.request-items li:hover {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.request-header {
+    display: flex;
+    align-items: center;
+}
+
+.status { 
+    padding: 4px 8px; /* Väčší padding */
+    border-radius: 12px; /* Zaoblenejší badge */
+    font-weight: bold; 
+    margin-left: 15px;
+    font-size: 0.9em;
+}
+
+.success { 
+    background-color: #d4edda; 
+    color: #155724; 
+}
+.pending { 
+    background-color: #fff3cd; 
+    color: #856404; 
+}
+/* PRIDANÝ ŠTÝL PRE ZRUŠENÚ */
+.cancelled { 
+    background-color: #f8d7da; /* Svetlo červené pozadie */
+    color: #721c24; /* Tmavá červená farba textu */
+}
+
+.allocation-details { 
+    margin-top: 10px; 
+    padding-top: 10px; 
+    border-top: 1px dashed #ced4da; /* Krajší deliaci riadok */
+    padding-left: 5px; /* Trochu odsadenie */
+}
 </style>

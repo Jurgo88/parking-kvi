@@ -19,6 +19,10 @@
 
     <div v-else>
       <ParkingRequestForm />
+
+      <hr> 
+      
+      <UserAllocations /> 
     </div>
   </main>
 </template>
@@ -26,22 +30,21 @@
 <script setup>
 import { onMounted, watch } from 'vue';
 import { useParkingStore } from '@/stores/ParkingStore';
-import { useAuthStore } from '@/stores/AuthStore'; // <--- NOVÝ IMPORT
+import { useAuthStore } from '@/stores/AuthStore';
 import ParkingRequestForm from '@/components/ParkingRequestForm.vue';
-import AuthForm from '@/components/AuthForm.vue'; // <--- NOVÝ IMPORT
+import AuthForm from '@/components/AuthForm.vue';
+// *** NOVÝ IMPORT ***
+import UserAllocations from '@/components/UserAllocations.vue'; 
 
 const parkingStore = useParkingStore();
 const authStore = useAuthStore();
 
-// Odstránime onMounted, pretože dáta budeme načítať pomocou WATCHERA
-// parkovací status sa bude načítať len ak sa zmení stav prihlásenia
+// Watcher bezo zmeny
 watch(() => authStore.userId, (newUserId) => {
   if (newUserId) {
-    // Ak sa používateľ prihlási, musíme načítať jeho status
     parkingStore.fetchUserStatus();
   } else {
-    // Ak sa používateľ odhlási, vyčistíme dáta
     parkingStore.$reset();
   }
-}, { immediate: true }); // Spustiť aj pri štarte
+}, { immediate: true });
 </script>
