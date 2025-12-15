@@ -7,7 +7,7 @@
   </template>
   
   <script setup>
-  import AdminUserList from '@/components/AdminUserList.vue';
+  import AdminUserList from '@/components/AdminUserList.vue'; //toto som fixol
   // Možno budeme neskôr kontrolovať, či je užívateľ admin, ale zatiaľ to preskočme.
   </script>
   

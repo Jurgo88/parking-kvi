@@ -31,7 +31,7 @@
   <script setup>
   import { useParkingStore } from '@/stores/ParkingStore';
   import { onMounted } from 'vue';
-  
+  // Načítame Parking Store
   const parkingStore = useParkingStore();
   
   onMounted(() => {
