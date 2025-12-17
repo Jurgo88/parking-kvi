@@ -2,18 +2,35 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 
 // Inline scheduled function – každý deň o 06:00
+// Inline scheduled function – každú minútu pre test
 export const config = {
-  schedule: "0 /1 * * *",
+  schedule: "*/1 * * * *", // každú minútu, pre produkciu zmeň na "0 6 * * *"
 }
-
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL"),
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-
-)
 
 const RANDOM_MAX = 50
 const RESERVED_LAST_MINUTE = 5
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL")
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+
+// Pomocná funkcia na fetch z Supabase
+async function supabaseFetch(table, options = {}) {
+  const { method = "GET", body = null, query = "" } = options
+  const url = `${supabaseUrl}/rest/v1/${table}${query}`
+  const res = await fetch(url, {
+    method,
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: body ? JSON.stringify(body) : null,
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(JSON.stringify(data))
+  return data
+}
 
 export default async (event) => {
   try {
@@ -24,27 +41,16 @@ export default async (event) => {
     console.log("📅 Running bulk lottery for date:", parkingDate)
 
     // --- načítanie sekcií ---
-    const { data: sections, error: secErr } = await supabase
-      .from("parking_configuration")
-      .select("*")
-      .order("lottery_order")
-    if (secErr) console.error("❌ Sections error:", secErr)
-    console.log("🅰️ Sections found:", sections?.length)
+    const sections = await supabaseFetch("parking_configuration", {
+      query: "?select=*&order=lottery_order.asc",
+    })
+    console.log("🅰️ Sections found:", sections.length)
 
     // --- načítanie requestov ---
-    const { data: requests, error: reqErr } = await supabase
-      .from("requests")
-      .select(`
-        request_id,
-        preferred_section,
-        users (
-          user_id,
-          priority_points
-        )
-      `)
-      .eq("parking_date", parkingDate)
-    if (reqErr) console.error("❌ Requests error:", reqErr)
-    console.log("🅱️ Requests found:", requests?.length)
+    const requests = await supabaseFetch("requests", {
+      query: `?select=request_id,preferred_section,users(user_id,priority_points)&parking_date=eq.${parkingDate}`,
+    })
+    console.log("🅱️ Requests found:", requests.length)
 
     if (!requests || requests.length === 0) {
       return new Response(`No requests for ${parkingDate}`, {
@@ -58,7 +64,7 @@ export default async (event) => {
       if (!r.users) console.warn("⚠️ Request missing user:", r.request_id)
     })
 
-    // --- vypocet skóre ---
+    // --- výpočet skóre ---
     const scored = requests.map((r) => {
       const random = Math.floor(Math.random() * (RANDOM_MAX + 1))
       const score = r.users ? r.users.priority_points + random : random
@@ -105,13 +111,10 @@ export default async (event) => {
 
     console.log("✅ Allocations prepared:", allocations.length)
 
-    // --- debug mód: zapíš len ak allocations existujú ---
+    // --- zapíš allocations ---
     if (allocations.length > 0) {
-      const { error: insertErr } = await supabase
-        .from("allocations")
-        .insert(allocations)
-      if (insertErr) console.error("❌ Insert error:", insertErr)
-      else console.log("💾 Allocations inserted")
+      await supabaseFetch("allocations", { method: "POST", body: allocations })
+      console.log("💾 Allocations inserted")
     }
 
     // --- body používateľov ---
@@ -120,13 +123,11 @@ export default async (event) => {
       const won = allocatedUsers.has(req.users.user_id)
       const pointsChange = won ? -5 : +1
 
-      const { error: updateErr } = await supabase
-        .from("users")
-        .update({
-          priority_points: req.users.priority_points + pointsChange,
-        })
-        .eq("user_id", req.users.user_id)
-      if (updateErr) console.error("❌ Update points error:", updateErr)
+      await supabaseFetch("users", {
+        method: "PATCH",
+        body: { priority_points: req.users.priority_points + pointsChange },
+        query: `?user_id=eq.${req.users.user_id}`,
+      })
     }
 
     return new Response(
@@ -147,3 +148,4 @@ export default async (event) => {
     })
   }
 }
+
