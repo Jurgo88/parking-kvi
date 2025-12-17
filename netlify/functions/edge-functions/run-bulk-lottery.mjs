@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 // Inline scheduled function – každý deň o 06:00
 export const config = {
-  schedule: "0 6 * * *",
+  schedule: "0 /1 * * *",
 }
 
 const supabase = createClient(
