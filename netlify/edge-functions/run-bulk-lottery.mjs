@@ -10,8 +10,8 @@ export const config = {
 const RANDOM_MAX = 50
 const RESERVED_LAST_MINUTE = 5
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL")
-const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+const supabaseUrl = Deno.env.get('SUPABASE_URL')
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
 // Pomocná funkcia na fetch z Supabase
 async function supabaseFetch(table, options = {}) {
