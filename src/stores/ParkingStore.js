@@ -27,68 +27,71 @@ export const useParkingStore = defineStore('parking', {
 
     // 2. ACTIONS (Funkcie, ktoré menia stav a komunikujú s API)
     actions: {
-        
+        getUserId() {
+            const authStore = useAuthStore();
+            return authStore.userId;
+        },
+
         /**
          * Načíta prioritné body a všetky žiadosti/alokácie používateľa.
          */
         async fetchUserStatus() {
-                        this.isLoading = true;
-                        this.error = null;
-                        
-                        const authStore = useAuthStore();
-                        const userId = authStore.userId; 
-                        
-                        if (!userId) {
-                            this.isLoading = false;
-                            this.userPoints = 0;
-                            this.userRequests = [];
-                            return; 
-                        }
-                        
-                        try {
-                            // 1. Získanie Prioritných Bodov (Bezo zmeny)
-                            const { data: user, error: userError } = await supabase
-                                .from('users')
-                                .select('priority_points')
-                                .eq('user_id', userId)
-                                .single(); 
-                            
-                            if (userError && userError.code !== 'PGRST116') {
-                                throw userError;
-                            }
-                            this.userPoints = user ? user.priority_points : 0;
+            this.isLoading = true;
+            this.error = null;
             
-                            // 2. Získanie všetkých žiadostí s ich alokáciami - VOLÁME POHĽAD!
-                            const { data: requests, error: reqError } = await supabase
-                                                 .from('user_request_summary') // <-- KĽÚČOVÁ ZMENA: VOLÁME VIEW
-                                                 .select('*')
-                                                 .eq('user_id', userId)
-                                                 .order('parking_date', { ascending: true });
-                            
-                                 if (reqError) throw reqError;
-                            
-                            // Formátovanie dát: Vytvárame objekt 'allocation' pre komponentu
-                            this.userRequests = requests.map(req => ({
-                                ...req,
-                                // Ak existuje allocation_id (z VIEW), vytvoríme objekt 'allocation'
-                                allocation: req.allocation_id != null ?{
-                                    allocation_id: req.allocation_id,
-                                    spot_number: req.spot_number,
-                                    is_cancelled: req.is_cancelled,
-                                    points_change: req.points_change,
-                                    // Pridávame aj dátum a sekciu priamo do allocation, ak to potrebujete
-                                    parking_date: req.parking_date, 
-                                    preferred_section: req.preferred_section
-                                } : null
-                            }));
+            const userId = this.getUserId();
             
-                        } catch (err) {
-                            console.error('Chyba pri načítaní stavu používateľa:', err);
-                            this.error = `Nepodarilo sa načítať dáta: ${err.message}`;
-                        } finally {
-                            this.isLoading = false;
-                        }
-                    },
+            if (!userId) {
+                this.isLoading = false;
+                this.userPoints = 0;
+                this.userRequests = [];
+                return; 
+            }
+            
+            try {
+                // 1. Získanie Prioritných Bodov (Bezo zmeny)
+                const { data: user, error: userError } = await supabase
+                    .from('users')
+                    .select('priority_points')
+                    .eq('user_id', userId)
+                    .single(); 
+                
+                if (userError && userError.code !== 'PGRST116') {
+                    throw userError;
+                }
+                this.userPoints = user ? user.priority_points : 0;
+    
+                // 2. Získanie všetkých žiadostí s ich alokáciami - VOLÁME POHĽAD!
+                const { data: requests, error: reqError } = await supabase
+                                     .from('user_request_summary') // <-- KĽÚČOVÁ ZMENA: VOLÁME VIEW
+                                     .select('*')
+                                     .eq('user_id', userId)
+                                     .order('parking_date', { ascending: false });
+                
+                     if (reqError) throw reqError;
+                
+                // Formátovanie dát: Vytvárame objekt 'allocation' pre komponentu
+                this.userRequests = requests.map(req => ({
+                    ...req,
+                    // Ak existuje allocation_id (z VIEW), vytvoríme objekt 'allocation'
+                    allocation: req.allocation_id != null ?{
+                        allocation_id: req.allocation_id,
+                        spot_number: req.spot_number,
+                        is_cancelled: req.is_cancelled,
+                        points_change: req.points_change,
+                        // Pridávame aj dátum a sekciu priamo do allocation, ak to potrebujete
+                        parking_date: req.parking_date, 
+                        preferred_section: req.preferred_section
+                    } : null
+                }));
+    
+            } catch (err) {
+                console.error('Chyba pri načítaní stavu používateľa:', err);
+                this.error = `Nepodarilo sa načítať dáta: ${err.message}`;
+            } finally {
+                this.isLoading = false;
+            }
+        },
 
         /**
          * Načíta zoznam všetkých používateľov s ich prioritnými bodmi (Pre Admina) cez RPC.
@@ -122,8 +125,7 @@ export const useParkingStore = defineStore('parking', {
         async submitRequest(parkingDate, preferredSection) {
             this.isLoading = true;
             this.error = null;
-            const authStore = useAuthStore();
-            const userId = authStore.userId; 
+            const userId = this.getUserId();
             const existingActiveRequest = this.userRequests.find(
                                 // Správne používa vstupný parameter 'parkingDate'
                                 (req) => req.parking_date === parkingDate && !req.is_cancelled
@@ -186,8 +188,7 @@ export const useParkingStore = defineStore('parking', {
             this.isLoading = true;
             this.error = null;
             
-            const authStore = useAuthStore();
-            const userId = authStore.userId;
+            const userId = this.getUserId();
             const numericAllocationId = parseInt(allocationId);
 
             if (!userId) {

@@ -3,11 +3,13 @@
       <h1>Administrátorský Prehľad</h1>
       
       <AdminUserList />
+      <AdminParkingList />
     </div>
   </template>
   
   <script setup>
-  import AdminUserList from '@/components/AdminUserList.vue'; //toto som fixol
+    import AdminUserList from '@/components/AdminUserList.vue'; //toto som fixol
+    import AdminParkingList from '@/components/AdminParkingList.vue'; // updated path to be consistent
   // Možno budeme neskôr kontrolovať, či je užívateľ admin, ale zatiaľ to preskočme.
   </script>
   

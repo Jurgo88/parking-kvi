@@ -1,16 +1,16 @@
 <template>
     <div class="allocation-info">
-        <p v-if="allocation.spot_number" class="spot-details"> 
+        <div v-if="allocation.spot_number" class="spot-details"> 
             <strong>Miesto:</strong> {{ allocation.spot_number }}
             <span v-if="allocation.preferred_section"> ({{ allocation.preferred_section }})</span>
             
             <span v-if="allocation.points_change" class="points-change">
-                [PB: {{ allocation.points_change }}]
+                [Zmena bodov: {{ allocation.points_change }}]
             </span>
-        </p>
-        <p v-else class="spot-details">
+        </div>
+        <div v-else class="spot-details">
             <strong>Miesto:</strong> Získané, ale chyba v detaile miesta
-        </p>
+        </div>
         
         <button 
             v-if="!isPastDate && !allocation.is_cancelled" 
@@ -21,12 +21,12 @@
             {{ isCancelling ? 'Zrušenie...' : 'Zrušiť alokáciu' }}
         </button>
 
-        <p v-else-if="allocation.is_cancelled" class="note cancelled">
+        <div v-else-if="allocation.is_cancelled" class="note cancelled">
             ❌ Táto alokácia bola zrušená.
-        </p>
-        <p v-else class="note">
+        </div>
+        <div v-else class="note">
             ⚠️ Alokáciu už nie je možné zrušiť (dátum prešiel).
-        </p>
+        </div>
     </div>
 </template>
 
@@ -83,10 +83,10 @@ const handleCancel = async () => {
 
 <style scoped>
 .allocation-info { 
-    margin-top: 5px; 
-    padding: 5px; 
+    /* margin-top: 5px;  */
+    /* padding: 5px;  */
     /* ... zachovanie vašich štýlov ... */
-    border-top: 1px dashed #eee; 
+    /* border-top: 1px dashed #eee;  */
     display: flex;
     align-items: center;
     justify-content: space-between;

@@ -59,7 +59,7 @@
   }
   .user-table th, .user-table td {
     border: 1px solid #ddd;
-    padding: 12px;
+    padding: 4px;
     text-align: left;
   }
   .user-table th {

@@ -83,8 +83,8 @@ const parkingStore = useParkingStore();
 }
 
 .status { 
-    padding: 4px 8px; /* Väčší padding */
-    border-radius: 12px; /* Zaoblenejší badge */
+    padding: 2px 8px; /* Väčší padding */
+    border-radius: 2px; /* Zaoblenejší badge */
     font-weight: bold; 
     margin-left: 15px;
     font-size: 0.9em;
@@ -109,5 +109,8 @@ const parkingStore = useParkingStore();
     padding-top: 10px; 
     border-top: 1px dashed #ced4da; /* Krajší deliaci riadok */
     padding-left: 5px; /* Trochu odsadenie */
+}
+.spot-details {
+    margin: 0;
 }
 </style>
