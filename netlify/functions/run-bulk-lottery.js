@@ -4,7 +4,7 @@ export const config = {
   schedule: "0 20 * * *", // test: každú minútu
 }
 
-const RANDOM_MAX = 100
+const RANDOM_MAX = 10
 
 const supabase = createClient(
   process.env.SUPABASE_URL,

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/AuthStore'; // <--- NOVÝ IMPORT
 
 import HomeView from '@/views/HomeView.vue';
 import AdminView from '@/views/AdminView.vue';
+import AdminLayout from '@/admin/AdminLayout.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,11 +17,47 @@ const router = createRouter({
       component: HomeView
     },
     {
-      path: '/admin',
-      name: 'admin',
-      component: AdminView,
-      meta: { requiresAuth: true, requiresAdmin: true } // Obe metadáta
-    }
+        path: '/admin',
+        component: AdminLayout, // toto je LAYOUT
+        meta: { requiresAuth: true, requiresAdmin: true },
+        children: [
+          {
+            path: '',
+            redirect: '/admin/users'
+          },
+          {
+            path: 'users',
+            name: 'admin-users',
+            component: () => import('@/admin/pages/Users.vue')
+          },
+          {
+            path: 'users/:id',
+            name: 'admin-user-detail',
+            component: () => import('@/admin/pages/UserDetail.vue')
+          },
+          {
+            path: 'parking',
+            name: 'admin-parking',
+            component: () => import('@/admin/pages/AdminParkingList.vue')
+          },
+          {
+            path: 'requests',
+            name: 'admin-requests',
+            component: () => import('@/admin/pages/Requests.vue')
+          },
+          {
+            path: 'allocations',
+            name: 'admin-allocations',
+            component: () => import('@/admin/pages/AdminParkingList.vue')
+          },
+        //   {
+        //     path: 'stats',
+        //     name: 'admin-stats',
+        //     component: () => import('@/admin/pages/AdminStats.vue')
+        //   }
+        ]
+      }
+      
   ]
 });
 
