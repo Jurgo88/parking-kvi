@@ -2,6 +2,8 @@
 
 // import './assets/main.css'
 import './style.css' // <--- AKTUALIZOVANÝ ŠTÝL SÚBOR
+import '@fortawesome/fontawesome-free/css/all.css';
+
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

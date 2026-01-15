@@ -1,15 +1,16 @@
 <template>
     <div class="allocation-info">
         <div v-if="allocation.spot_number" class="spot-details"> 
-            <strong>Miesto:</strong> {{ allocation.spot_number }}
+            <strong>Spot:</strong> {{ allocation.spot_number }}
             <span v-if="allocation.preferred_section"> ({{ allocation.preferred_section }})</span>
+            <!-- <br><br> -->
             
-            <span v-if="allocation.points_change" class="points-change">
-                [Zmena bodov: {{ allocation.points_change }}]
-            </span>
+            <!-- <span v-if="allocation.points_change" class="points-change">
+                [Points change: {{ allocation.points_change }}]
+            </span> -->
         </div>
         <div v-else class="spot-details">
-            <strong>Miesto:</strong> Získané, ale chyba v detaile miesta
+            <strong>Spot:</strong> Allocated, but spot detail is missing
         </div>
         
         <button 
@@ -18,14 +19,14 @@
             :disabled="isCancelling"
             class="cancel-btn"
         >
-            {{ isCancelling ? 'Zrušenie...' : 'Zrušiť alokáciu' }}
+            {{ isCancelling ? 'Cancelling...' : 'Cancel' }}
         </button>
 
         <div v-else-if="allocation.is_cancelled" class="note cancelled">
-            ❌ Táto alokácia bola zrušená.
+            ❌ This allocation has been cancelled.
         </div>
         <div v-else class="note">
-            ⚠️ Alokáciu už nie je možné zrušiť (dátum prešiel).
+            ⚠️ Allocation can no longer be cancelled (date has passed).
         </div>
     </div>
 </template>
@@ -37,14 +38,14 @@ import { defineProps, ref, computed } from 'vue';
 import { useParkingStore } from '@/stores/ParkingStore';
 
 const props = defineProps({
-    // Celý objekt alokácie, ktorý posielame z UserAllocations.vue
+    // Full allocation object passed from UserAllocations.vue
     allocation: {
         type: Object,
         required: true
     },
-    // Dátum parkovania, ktorý posielame z UserAllocations.vue
+    // Parking date passed from UserAllocations.vue (format YYYY-MM-DD)
     parkingDate: {
-        type: String, // Očakávame formát YYYY-MM-DD
+        type: String,
         required: true
     }
 });
@@ -52,7 +53,7 @@ const props = defineProps({
 const parkingStore = useParkingStore();
 const isCancelling = ref(false);
 
-// Vypočítaná vlastnosť: Skontroluje, či je dátum parkovania už v minulosti
+// Computed: checks whether the parking date is already in the past
 const isPastDate = computed(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0); 
@@ -63,17 +64,17 @@ const isPastDate = computed(() => {
 });
 
 const handleCancel = async () => {
-    if (confirm('Naozaj chcete zrušiť túto alokáciu? Získate prioritné body. Pokračovať?')) {
+    if (confirm('Are you sure you want to cancel this allocation? You will receive priority points. Continue?')) {
         isCancelling.value = true;
         try {
-            // Volanie akcie v Store, ktorá volá SQL funkciu 'cancel_allocation'
+            // Call store action that invokes SQL function 'cancel_allocation'
             await parkingStore.cancelAllocation(props.allocation.allocation_id);
             
-            alert('Alokácia bola úspešne zrušená a body pripísané!');
-            // Store po úspechu automaticky obnoví stav cez fetchUserStatus()
+            alert('Allocation successfully cancelled and points awarded!');
+            // Store should refresh state (e.g. via fetchUserStatus()) after success
             
         } catch (e) {
-            alert('Chyba pri zrušení alokácie: ' + e.message);
+            alert('Error cancelling allocation: ' + (e.message || e));
         } finally {
             isCancelling.value = false;
         }
@@ -83,10 +84,6 @@ const handleCancel = async () => {
 
 <style scoped>
 .allocation-info { 
-    /* margin-top: 5px;  */
-    /* padding: 5px;  */
-    /* ... zachovanie vašich štýlov ... */
-    /* border-top: 1px dashed #eee;  */
     display: flex;
     align-items: center;
     justify-content: space-between;

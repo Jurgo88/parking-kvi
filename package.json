@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
     "@netlify/functions": "^5.1.1",
     "@supabase/supabase-js": "^2.87.1",
     "dotenv": "^17.2.3",

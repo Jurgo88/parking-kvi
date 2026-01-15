@@ -3,6 +3,7 @@
 import { defineStore } from 'pinia';
 import { supabase } from '@/supabase/supabaseClient';
 import { useAuthStore } from './AuthStore'; // <--- KROK 9: IMPORT pre získanie user ID
+import { cancel } from 'redux-saga/effects';
 
 export const useParkingStore = defineStore('parking', {
     state: () => ({
@@ -143,9 +144,13 @@ export const useParkingStore = defineStore('parking', {
                 this.isLoading = false;
                 return;
             }
+
+            if (!preferredSection) {
+                preferredSection = null; // Ak nie je vybraná sekcia, nastavíme na null
+            }
             
-            if (!parkingDate || !preferredSection) {
-                this.error = "Vyberte prosím dátum a sekciu.";
+            if (!parkingDate ) {
+                this.error = "Please select date.";
                 this.isLoading = false;
                 return;
             }
@@ -215,6 +220,39 @@ export const useParkingStore = defineStore('parking', {
             } catch (err) {
                 console.error('Chyba pri zrušení alokácie:', err);
                 this.error = `Nepodarilo sa zrušiť rezerváciu: ${err.message}`;
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        async cancelRequest(requestId) {
+            this.isLoading = true;
+            this.error = null;
+
+            const userId = this.getUserId();
+            if (!userId) {
+                this.error = "Nie ste prihlásený.";
+                this.isLoading = false;
+                return;
+            }
+            try {
+                const numericRequestId = parseInt(requestId, 10);
+                const { error } = await supabase
+                    .from('requests')
+                    .delete()
+                    .eq('request_id', numericRequestId)
+                    .eq('user_id', userId);
+
+                if (error) {
+                    throw error;
+                }
+
+
+                await this.fetchUserStatus();
+
+            } catch (err) {
+                console.error('Chyba pri zrušení žiadosti:', err);
+                this.error = `Nepodarilo sa zrušiť žiadosť: ${err.message}`;
             } finally {
                 this.isLoading = false;
             }

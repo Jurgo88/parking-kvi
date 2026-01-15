@@ -1,5 +1,11 @@
 
 /* Základný reset a font */
+:root {
+  --primary-color: #2274a5;
+  --secondary-color: #85aab6;
+  --terciary-color: #b6c5be;
+  --quaternary-color: #e7dfc6;
+}
 body {
     margin: 0;
     font-family: 'Arial', sans-serif;

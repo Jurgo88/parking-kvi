@@ -25,11 +25,16 @@ export default async function handler(event) {
     console.log("📆 Parking date:", parkingDate)
 
     // --- ochrana proti opakovaniu ---
-    const { data: existing } = await supabase
+    const { data: existing, error: existingErr } = await supabase
       .from("allocations")
       .select("allocation_id")
       .eq("parking_date", parkingDate)
       .limit(1)
+
+    if (existingErr) {
+      console.error("❌ DB error checking existing allocations:", existingErr)
+      throw existingErr
+    }
 
     if (existing?.length) {
       console.log("⛔ Allocations already exist, exiting")
@@ -37,10 +42,15 @@ export default async function handler(event) {
     }
 
     // --- sekcie ---
-    const { data: sections } = await supabase
+    const { data: sections = [], error: sectionsErr } = await supabase
       .from("parking_configuration")
       .select("*")
       .order("lottery_order")
+
+    if (sectionsErr) {
+      console.error("❌ DB error loading sections:", sectionsErr)
+      throw sectionsErr
+    }
 
     console.log(
       "🅰️ Sections:",
@@ -48,7 +58,7 @@ export default async function handler(event) {
     )
 
     // --- requests ---
-    const { data: requests } = await supabase
+    const { data: requests = [], error: requestsErr } = await supabase
       .from("requests")
       .select(`
         request_id,
@@ -61,32 +71,48 @@ export default async function handler(event) {
       `)
       .eq("parking_date", parkingDate)
 
-    console.log("🅱️ Requests found:", requests.length)
-    if (!requests.length) return
+    if (requestsErr) {
+      console.error("❌ DB error loading requests:", requestsErr)
+      throw requestsErr
+    }
+
+    console.log("🅱️ Requests found:", (requests || []).length)
+    if (!requests || !requests.length) return
 
     // --- skóre ---
     const scored = requests
       .map(r => {
         const rand = Math.floor(Math.random() * (RANDOM_MAX + 1))
-        const score = r.users.priority_points + rand
+        const userPoints = Number(r.users?.priority_points) || 0
+        const score = userPoints + rand
         console.log(
-          `🎲 ${r.users.email}: base=${r.users.priority_points}, rand=${rand}, score=${score}`
+          `🎲 ${r.users?.email || r.users?.user_id}: base=${userPoints}, rand=${rand}, score=${score}`
         )
         return { ...r, score }
       })
       .sort((a, b) => b.score - a.score)
 
     // --- načítaj VOĽNÉ MIESTA ---
-    const { data: occupied } = await supabase
+    const { data: occupied = [], error: occupiedErr } = await supabase
       .from("allocations")
       .select("parking_spot_id")
       .eq("parking_date", parkingDate)
 
-    const occupiedIds = new Set(occupied.map(o => o.parking_spot_id))
+    if (occupiedErr) {
+      console.error("❌ DB error loading occupied allocations:", occupiedErr)
+      throw occupiedErr
+    }
 
-    const { data: allSpots } = await supabase
+    const occupiedIds = new Set((occupied || []).map(o => o.parking_spot_id))
+
+    const { data: allSpots = [], error: spotsErr } = await supabase
       .from("parking_spots")
       .select("*")
+
+    if (spotsErr) {
+      console.error("❌ DB error loading parking_spots:", spotsErr)
+      throw spotsErr
+    }
 
     const freeSpotsBySection = {}
     allSpots.forEach(s => {
@@ -107,7 +133,7 @@ export default async function handler(event) {
     // --- kapacity ---
     const capacity = {}
     sections.forEach(s => {
-      capacity[s.section_code] = s.bulk_allocation_limit
+      capacity[s.section_code] = Number(s.bulk_allocation_limit) || 0
     })
 
     const allocations = []
@@ -115,7 +141,8 @@ export default async function handler(event) {
 
     // --- ALOKÁCIA ---
     for (const r of scored) {
-      const userId = r.users.user_id
+      const userId = r.users?.user_id
+      if (!userId) continue
       if (allocatedUsers.has(userId)) continue
 
       let chosenSection = null
@@ -123,8 +150,8 @@ export default async function handler(event) {
       // preferencia
       if (
         r.preferred_section &&
-        capacity[r.preferred_section] > 0 &&
-        freeSpotsBySection[r.preferred_section]?.length
+        (capacity[r.preferred_section] || 0) > 0 &&
+        (freeSpotsBySection[r.preferred_section]?.length || 0) > 0
       ) {
         chosenSection = r.preferred_section
       }
@@ -133,8 +160,8 @@ export default async function handler(event) {
       if (!chosenSection) {
         for (const s of sections) {
           if (
-            capacity[s.section_code] > 0 &&
-            freeSpotsBySection[s.section_code]?.length
+            (capacity[s.section_code] || 0) > 0 &&
+            (freeSpotsBySection[s.section_code]?.length || 0) > 0
           ) {
             chosenSection = s.section_code
             break
@@ -143,11 +170,15 @@ export default async function handler(event) {
       }
 
       if (!chosenSection) {
-        console.log(`❌ No free spot for ${users.email}`)
+        console.log(`❌ No free spot for ${r.users?.email || r.users?.user_id}`)
         continue
       }
 
       const spot = freeSpotsBySection[chosenSection].shift()
+      if (!spot) {
+        console.log(`❌ No spot object available for section ${chosenSection} for ${r.users?.email}`)
+        continue
+      }
 
       allocations.push({
         request_id: r.request_id,
@@ -165,7 +196,7 @@ export default async function handler(event) {
       allocatedUsers.add(userId)
 
       console.log(
-        `🅿️ Allocated ${r.users.email} → ${spot.spot_number}`
+        `🅿️ Allocated ${r.users?.email || r.users?.user_id} → ${spot.spot_number}`
       )
     }
 
@@ -190,13 +221,83 @@ export default async function handler(event) {
     // --- body ---
     if (!DRY_RUN) {
       for (const r of scored) {
-        const delta = allocatedUsers.has(r.users.user_id) ? -5 : +1
-        await supabase
-          .from("users")
-          .update({
-            priority_points: r.users.priority_points + delta,
+        const uid = r.users?.user_id
+        if (!uid) continue
+        const delta = allocatedUsers.has(uid) ? -5 : +1
+
+        // Preferred approach: have a DB RPC that performs atomic increment:
+        // CREATE FUNCTION increment_user_priority_points(p_user_id uuid, p_delta int) ...
+        // and then call the rpc below. If it exists, it will provide atomic increment.
+        try {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc("increment_priority_points", {
+            p_user_id: uid,
+            p_delta: delta,
           })
-          .eq("user_id", r.users.user_id)
+
+          if (rpcErr) {
+            console.warn("⚠️ RPC increment_priority_points failed:", rpcErr)
+
+            // fallback: read fresh value a deterministicky update
+            const { data: userRow, error: selErr } = await supabase
+              .from("users")
+              .select("priority_points")
+              .eq("user_id", uid)
+              .single()
+
+            if (selErr) {
+              console.error("❌ Failed to read user for fallback:", selErr)
+              continue
+            }
+
+            const current = Number(userRow?.priority_points) || 0
+            const newVal = current + delta
+
+            const { error: updErr } = await supabase
+              .from("users")
+              .update({ priority_points: newVal })
+              .eq("user_id", uid)
+
+            if (updErr) {
+              console.error("❌ Fallback UPDATE failed for user", uid, ":", updErr)
+            } else {
+              console.log(`🔁 Fallback updated user ${uid} priority_points: ${current} → ${newVal}`)
+            }
+          } else {
+            console.log(`✅ RPC increment_priority_points OK for ${uid} (delta=${delta})`, rpcData)
+          }
+        } catch (rpcException) {
+          console.error("❌ RPC exception increment_priority_points:", rpcException)
+
+          // fallback same as above
+          try {
+            const { data: userRow, error: selErr } = await supabase
+              .from("users")
+              .select("priority_points")
+              .eq("user_id", uid)
+              .single()
+
+            if (selErr) {
+              console.error("❌ Failed to read user for fallback after RPC exception:", selErr)
+              continue
+            }
+
+            const current = Number(userRow?.priority_points) || 0
+            const newVal = current + delta
+
+            const { error: updErr } = await supabase
+              .from("users")
+              .update({ priority_points: newVal })
+              .eq("user_id", uid)
+
+            if (updErr) {
+              console.error("❌ Fallback UPDATE failed for user", uid, ":", updErr)
+            } else {
+              console.log(`🔁 Fallback updated user ${uid} priority_points: ${current} → ${newVal}`)
+            }
+          } catch (finalErr) {
+            console.error("❌ Unexpected fallback error for", uid, finalErr)
+          }
+        }
       }
     }
 
